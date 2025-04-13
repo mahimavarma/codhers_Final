@@ -1,0 +1,38 @@
+{
+  "metrics": {
+    "accuracy": 0.9795370680979537,
+    "precision": 0.9337877312560857,
+    "recall": 0.9466929911154985,
+    "f1": 0.9401960784313725,
+    "confusion_matrix": {
+      "true_negatives": 4881,
+      "false_positives": 68,
+      "false_negatives": 54,
+      "true_positives": 959
+    }
+  },
+  "feature_importances": {
+    "MajorImageVersion": 0.37607307661144723,
+    "SizeOfCode": 0.13970003448453291,
+    "SizeOfInitializedData": 0.13174324330906492,
+    "CheckSum": 0.08698506848831622,
+    "AddressOfEntryPoint": 0.06058371934505262,
+    "MinorLinkerVersion": 0.045768145408396695,
+    "SizeOfImage": 0.044337438968362695,
+    "TimeDateStamp": 0.0219072765038137,
+    "e_lfanew": 0.01857044638179167,
+    "FileAlignment": 0.01673136520932079,
+    "MajorOperatingSystemVersion": 0.015841415291436334,
+    "NumberOfSections": 0.009958218889574075,
+    "SizeOfHeaders": 0.007703174381645627,
+    "MajorLinkerVersion": 0.006360192835271558,
+    "SizeOfUninitializedData": 0.0037366170455575163,
+    "BaseOfCode": 0.0026174762400522677,
+    "SizeOfStackReserve": 0.0017240555890792946,
+    "SizeOfHeapReserve": 0.0016238321313712509,
+    "MinorOperatingSystemVersion": 0.0016020926334398985,
+    "e_minalloc": 0.0014714886968863014
+  },
+  "training_samples": 23845,
+  "test_samples": 5962
+}

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PE-Based Malware Detection System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        .results-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">PE-Based Malware Detection System</h1>
+            <p class="text-gray-600">Upload PE files to analyze for potential malware</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Files</h2>
+            
+            <div id="upload-area" class="upload-area p-8 text-center mb-4">
+                <div id="drop-message">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="mt-2 text-gray-600">Drag and drop files here or</p>
+                </div>
+                
+                <div class="mt-4">
+                    <label for="file-input" class="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition-colors">
+                        Select Files
+                    </label>
+                    <input id="file-input" type="file" class="hidden" multiple>
+                </div>
+                
+                <div id="file-list" class="mt-4"></div>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="analyze-btn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Analyze Files
+                </button>
+            </div>
+        </div>
+
+        <div id="results-section" class="bg-white rounded-lg shadow-md p-6 mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4">Detection Results</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-blue-50 p-4 rounded-md">
+                    <h3 class="font-medium text-blue-800">Total Files</h3>
+                    <p id="total-count" class="text-2xl font-bold text-blue-900">0</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded-md">
+                    <h3 class="font-medium text-red-800">Malware Detected</h3>
+                    <p id="malware-count" class="text-2xl font-bold text-red-900">0</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-md">
+                    <h3 class="font-medium text-green-800">Benign Files</h3>
+                    <p id="benign-count" class="text-2xl font-bold text-green-900">0</p>
+                </div>
+            </div>
+            
+            <div class="results-container">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table" class="bg-white divide-y divide-gray-200">
+                        <!-- Results will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-6 flex justify-center">
+                <button id="download-report" class="bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-6 rounded-md transition-colors">
+                    Download Report
+                </button>
+            </div>
+        </div>
+
+        <div id="detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800" id="detail-modal-title">File Analysis Details</h3>
+                        <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div id="detail-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const fileList = document.getElementById('file-list');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const resultsSection = document.getElementById('results-section');
+            const totalCount = document.getElementById('total-count');
+            const malwareCount = document.getElementById('malware-count');
+            const benignCount = document.getElementById('benign-count');
+            const resultsTable = document.getElementById('results-table');
+            const downloadReport = document.getElementById('download-report');
+            const detailModal = document.getElementById('detail-modal');
+            const closeModal = document.getElementById('close-modal');
+            const detailContent = document.getElementById('detail-content');
+            
+            let files = [];
+            let analysisResults = [];
+            
+            // Handle drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                uploadArea.classList.add('dragover');
+            }
+            
+            function unhighlight() {
+                uploadArea.classList.remove('dragover');
+            }
+            
+            // Handle file drop
+            uploadArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const newFiles = dt.files;
+                
+                handleFiles(newFiles);
+            }
+            
+            // Handle file input
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+            
+            function handleFiles(newFiles) {
+                files = [...files, ...Array.from(newFiles)];
+                updateFileList();
+                
+                if (files.length > 0) {
+                    analyzeBtn.disabled = false;
+                }
+            }
+            
+            function updateFileList() {
+                fileList.innerHTML = '';
+                
+                if (files.length === 0) {
+                    return;
+                }
+                
+                const fileTable = document.createElement('table');
+                fileTable.className = 'w-full mt-4';
+                
+                const tableHeader = document.createElement('thead');
+                tableHeader.innerHTML = `
+                    <tr class="text-left text-gray-500 text-sm">
+                        <th class="py-2">File Name</th>
+                        <th class="py-2">Size</th>
+                        <th class="py-2">Actions</th>
+                    </tr>
+                `;
+                
+                const tableBody = document.createElement('tbody');
+                
+                files.forEach((file, index) => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-t border-gray-200';
+                    
+                    const fileName = document.createElement('td');
+                    fileName.className = 'py-2 text-sm';
+                    fileName.textContent = file.name;
+                    
+                    const fileSize = document.createElement('td');
+                    fileSize.className = 'py-2 text-sm';
+                    fileSize.textContent = formatFileSize(file.size);
+                    
+                    const actions = document.createElement('td');
+                    actions.className = 'py-2 text-sm';
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'text-red-500 hover:text-red-700';
+                    removeBtn.innerHTML = 'Remove';
+                    removeBtn.onclick = function() {
+                        files.splice(index, 1);
+                        updateFileList();
+                        
+                        if (files.length === 0) {
+                            analyzeBtn.disabled = true;
+                        }
+                    };
+                    
+                    actions.appendChild(removeBtn);
+                    
+                    row.appendChild(fileName);
+                    row.appendChild(fileSize);
+                    row.appendChild(actions);
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                fileTable.appendChild(tableHeader);
+                fileTable.appendChild(tableBody);
+                fileList.appendChild(fileTable);
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Handle analyze button
+            analyzeBtn.addEventListener('click', function() {
+                // Simulate analysis (in a real app, you would send files to your backend)
+                analyzeFiles();
+            });
+            
+            function analyzeFiles() {
+                // Reset results
+                analysisResults = [];
+                
+                // Show loading state
+                analyzeBtn.disabled = true;
+                analyzeBtn.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Analyzing...
+                `;
+                
+                // Simulate analysis delay
+                setTimeout(() => {
+                    // In a real app, this would be the result from your backend
+                    files.forEach(file => {
+                        // Generate mock analysis result
+                        const isMalware = Math.random() > 0.7;
+                        const confidence = (isMalware ? 0.7 : 0.8) + (Math.random() * 0.3);
+                        
+                        const mockFeatures = [
+                            { name: 'SectionAlignment', importance: 0.153, value: 4096 },
+                            { name: 'SizeOfCode', importance: 0.126, value: 29696 },
+                            { name: 'NumberOfSections', importance: 0.091, value: isMalware ? 8 : 3 },
+                            { name: 'SizeOfInitializedData', importance: 0.084, value: isMalware ? 237568 : 92160 },
+                            { name: 'DllCharacteristics', importance: 0.077, value: isMalware ? 0 : 33088 }
+                        ];
+                        
+                        analysisResults.push({
+                            filename: file.name,
+                            is_malware: isMalware,
+                            confidence: confidence,
+                            size: file.size,
+                            model_votes: {
+                                gb_model: isMalware ? 1 : 0,
+                                rf_model: isMalware ? (Math.random() > 0.8 ? 0 : 1) : (Math.random() > 0.8 ? 1 : 0)
+                            },
+                            top_contributing_features: mockFeatures
+                        });
+                    });
+                    
+                    // Display results
+                    displayResults();
+                    
+                    // Reset button
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Files';
+                }, 2000);
+            }
+            
+            function displayResults() {
+                // Update counters
+                totalCount.textContent = analysisResults.length;
+                malwareCount.textContent = analysisResults.filter(r => r.is_malware).length;
+                benignCount.textContent = analysisResults.filter(r => !r.is_malware).length;
+                
+                // Clear table
+                resultsTable.innerHTML = '';
+                
+                // Add results to table
+                analysisResults.forEach((result, index) => {
+                    const row = document.createElement('tr');
+                    
+                    // File name
+                    const fileCell = document.createElement('td');
+                    fileCell.className = 'px-6 py-4 whitespace-nowrap';
+                    
+                    const fileName = document.createElement('div');
+                    fileName.className = 'text-sm font-medium text-gray-900';
+                    fileName.textContent = result.filename;
+                    
+                    const fileSize = document.createElement('div');
+                    fileSize.className = 'text-sm text-gray-500';
+                    fileSize.textContent = formatFileSize(result.size);
+                    
+                    fileCell.appendChild(fileName);
+                    fileCell.appendChild(fileSize);
+                    
+                    // Status
+                    const statusCell = document.createElement('td');
+                    statusCell.className = 'px-6 py-4 whitespace-nowrap';
+                    
+                    const statusBadge = document.createElement('span');
+                    statusBadge.className = `px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${result.is_malware ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`;
+                    statusBadge.textContent = result.is_malware ? 'Malware' : 'Benign';
+                    
+                    statusCell.appendChild(statusBadge);
+                    
+                    // Confidence
+                    const confidenceCell = document.createElement('td');
+                    confidenceCell.className = 'px-6 py-4 whitespace-nowrap';
+                    
+                    const progress = document.createElement('div');
+                    progress.className = 'w-full h-2 bg-gray-200 rounded-full overflow-hidden';
+                    
+                    const progressBar = document.createElement('div');
+                    progressBar.className = `h-full ${result.is_malware ? 'bg-red-500' : 'bg-green-500'}`;
+                    progressBar.style.width = `${result.confidence * 100}%`;
+                    
+                    const confidenceText = document.createElement('div');
+                    confidenceText.className = 'text-sm text-gray-500 mt-1';
+                    confidenceText.textContent = `${Math.round(result.confidence * 100)}%`;
+                    
+                    progress.appendChild(progressBar);
+                    confidenceCell.appendChild(progress);
+                    confidenceCell.appendChild(confidenceText);
+                    
+                    // Details
+                    const detailsCell = document.createElement('td');
+                    detailsCell.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium';
+                    
+                    const detailsBtn = document.createElement('button');
+                    detailsBtn.className = 'text-blue-600 hover:text-blue-900';
+                    detailsBtn.textContent = 'View Details';
+                    detailsBtn.onclick = function() {
+                        showDetails(result);
+                    };
+                    
+                    detailsCell.appendChild(detailsBtn);
+                    
+                    // Add all cells to row
+                    row.appendChild(fileCell);
+                    row.appendChild(statusCell);
+                    row.appendChild(confidenceCell);
+                    row.appendChild(detailsCell);
+                    
+                    // Add row to table
+                    resultsTable.appendChild(row);
+                });
+                
+                // Show results section
+                resultsSection.classList.remove('hidden');
+            }
+            
+            function showDetails(result) {
+                // Set modal title
+                document.getElementById('detail-modal-title').textContent = 
+                    `Analysis Details: ${result.filename}`;
+                
+                // Build detail content
+                let content = `
+                    <div class="mb-6">
+                        <div class="flex items-center mb-2">
+                            <div class="text-lg font-bold mr-2">Detection Result:</div>
+                            <span class="px-3 py-1 inline-flex text-sm font-semibold rounded-full ${result.is_malware ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                                ${result.is_malware ? 'Malware Detected' : 'Benign'}
+                            </span>
+                        </div>
+                        <div class="text-gray-700">Confidence: ${Math.round(result.confidence * 100)}%</div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-2">Model Votes</h4>
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-500">Gradient Boosting</div>
+                                    <div class="font-medium">${result.model_votes.gb_model === 1 ? 'Malware' : 'Benign'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-500">Random Forest</div>
+                                    <div class="font-medium">${result.model_votes.rf_model === 1 ? 'Malware' : 'Benign'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Top Contributing Features</h4>
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead>
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Feature</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Importance</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                `;
+                
+                result.top_contributing_features.forEach(feature => {
+                    content += `
+                        <tr>
+                            <td class="px-4 py-2 text-sm">${feature.name}</td>
+                            <td class="px-4 py-2 text-sm">${feature.value}</td>
+                            <td class="px-4 py-2 text-sm">
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${feature.importance * 100 * 6}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-500">${(feature.importance * 100).toFixed(2)}%</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                content += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                
+                // Set content
+                detailContent.innerHTML = content;
+                
+                // Show modal
+                detailModal.classList.remove('hidden');
+            }
+            
+            // Close detail modal
+            closeModal.addEventListener('click', function() {
+                detailModal.classList.add('hidden');
+            });
+            
+            // Close modal when clicking outside
+            detailModal.addEventListener('click', function(e) {
+                if (e.target === detailModal) {
+                    detailModal.classList.add('hidden');
+                }
+            });
+            
+            // Download report
+            downloadReport.addEventListener('click', function() {
+                const report = {
+                    summary: {
+                        total_files: analysisResults.length,
+                        malware_detected: analysisResults.filter(r => r.is_malware).length,
+                        benign_files: analysisResults.filter(r => !r.is_malware).length,
+                        average_confidence: analysisResults.reduce((acc, r) => acc + r.confidence, 0) / analysisResults.length,
+                        timestamp: new Date().toISOString()
+                    },
+                    detailed_results: analysisResults
+                };
+                
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(report, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "malware_report.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            });
+        });
+    </script>
+</body>
+</html>
